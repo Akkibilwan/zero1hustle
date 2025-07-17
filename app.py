@@ -3,11 +3,32 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 import pandas as pd
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+
+# Try multiple import approaches for Google API client
+try:
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+except ImportError:
+    try:
+        from google.api_core import build
+        from google.api_core.exceptions import GoogleAPIError as HttpError
+    except ImportError:
+        st.error("❌ Google API client not found. Please install google-api-python-client")
+        st.stop()
+
 from isodate import parse_duration
 import gspread
-from google.oauth2.service_account import Credentials
+
+# Try multiple import approaches for Google Auth
+try:
+    from google.oauth2.service_account import Credentials
+except ImportError:
+    try:
+        from oauth2client.service_account import ServiceAccountCredentials as Credentials
+        st.warning("⚠️ Using legacy oauth2client. Consider upgrading to google-auth.")
+    except ImportError:
+        st.error("❌ Google authentication library not found. Please install google-auth or oauth2client")
+        st.stop()
 
 # --------------------------- Scheduler Thread Logic ---------------------------
 
@@ -73,7 +94,8 @@ EXPECTED_HEADER = [
 @st.cache_resource(ttl=3600)
 def get_google_sheet_client():
     """
-    Authorize via service-account JSON stored in st.secrets using modern google-auth.
+    Authorize via service-account JSON stored in st.secrets.
+    Supports both modern google-auth and legacy oauth2client.
     Returns None + logs an error if authentication fails.
     """
     try:
@@ -82,7 +104,16 @@ def get_google_sheet_client():
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive",
         ]
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        
+        # Try modern google-auth first
+        try:
+            from google.oauth2.service_account import Credentials
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        except ImportError:
+            # Fall back to legacy oauth2client
+            from oauth2client.service_account import ServiceAccountCredentials
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
+        
         client = gspread.authorize(creds)
         return client
     except Exception as e:

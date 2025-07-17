@@ -1,26 +1,31 @@
 import streamlit as st
 
-# ─────────── Dependencies ───────────
-# Make sure your requirements.txt includes:
-#   google-api-python-client
-#   oauth2client
-#   gspread
-#   isodate
-#   pandas
+# ─────────── Runtime Dependency Installer ───────────
 
-# Try the modern import, fall back to the old package name if needed:
-try:
-    from googleapiclient.discovery import build
-except ImportError:
+import subprocess
+import sys
+
+def ensure_dependency(module_name: str, package_name: str = None):
+    """
+    If `module_name` isn't importable, pip‑install `package_name` (or module_name if not provided).
+    """
+    pkg = package_name or module_name
     try:
-        from apiclient.discovery import build
+        __import__(module_name)
     except ImportError:
-        st.error(
-            "❌ Could not import Google API client. "
-            "Please add ‘google‑api‑python‑client’ to your requirements.txt and redeploy."
-        )
-        raise
+        st.info(f"🔄 Installing missing package: {pkg}…")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
+# Ensure the core dependencies are present
+ensure_dependency("googleapiclient", "google-api-python-client")
+ensure_dependency("oauth2client")
+ensure_dependency("gspread")
+ensure_dependency("isodate")
+ensure_dependency("pandas")
+
+# ──────────────────────────────────────────────────────────
+
+from googleapiclient.discovery import build
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -82,8 +87,7 @@ def get_google_sheet_client():
             "https://www.googleapis.com/auth/drive",
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
-        client = gspread.authorize(creds)
-        return client
+        return gspread.authorize(creds)
     except Exception as e:
         st.error(f"❌ Error setting up Google Sheets client: {e}")
         return None
@@ -95,8 +99,7 @@ def get_worksheet():
         return None
     try:
         spreadsheet = client.open_by_url(GOOGLE_SHEET_URL)
-        worksheet = spreadsheet.worksheet("Sheet1")
-        return worksheet
+        return spreadsheet.worksheet("Sheet1")
     except Exception as e:
         st.error(f"❌ Error opening worksheet 'Sheet1': {e}")
         return None
@@ -191,8 +194,7 @@ def discover_shorts():
 
             for item in pl_resp.get("items", []):
                 vid_id = item["snippet"]["resourceId"]["videoId"]
-                published_at = item["snippet"]["publishedAt"]
-                if not is_within_today(published_at):
+                if not is_within_today(item["snippet"]["publishedAt"]):
                     continue
 
                 cd_resp = retry_youtube_call(
@@ -204,7 +206,9 @@ def discover_shorts():
                     logs.append(f"⚠️ Could not fetch contentDetails for {vid_id}. Skipping.")
                     continue
 
-                duration_secs = iso8601_to_seconds(cd_resp["items"][0]["contentDetails"]["duration"])
+                duration_secs = iso8601_to_seconds(
+                    cd_resp["items"][0]["contentDetails"]["duration"]
+                )
                 if duration_secs <= 180:
                     pub_iso = cd_resp["items"][0]["snippet"]["publishedAt"]
                     pub_dt = datetime.fromisoformat(
@@ -251,9 +255,9 @@ def fetch_statistics(video_ids):
     return stats_dict
 
 # ----------------------- Core “Run Now” Function ----------------------------
-# Paste your full run_once_and_append() implementation here unchanged:
+# Paste your existing run_once_and_append() logic here, unchanged:
 def run_once_and_append():
-    # … your existing logic …
+    # … your implementation …
     pass
 
 # ----------------------- Streamlit Layout ----------------------------

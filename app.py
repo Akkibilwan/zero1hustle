@@ -7,7 +7,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from isodate import parse_duration
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 
 # --------------------------- Scheduler Thread Logic ---------------------------
 
@@ -73,7 +73,7 @@ EXPECTED_HEADER = [
 @st.cache_resource(ttl=3600)
 def get_google_sheet_client():
     """
-    Authorize via service-account JSON stored in st.secrets.
+    Authorize via service-account JSON stored in st.secrets using modern google-auth.
     Returns None + logs an error if authentication fails.
     """
     try:
@@ -82,7 +82,7 @@ def get_google_sheet_client():
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive",
         ]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(creds)
         return client
     except Exception as e:
@@ -92,7 +92,7 @@ def get_google_sheet_client():
 @st.cache_resource(ttl=3600)
 def get_worksheet():
     """
-    Open the Google Sheet by URL, then fetch the “Sheet1” worksheet.
+    Open the Google Sheet by URL, then fetch the "Sheet1" worksheet.
     Returns None + logs if anything goes wrong.
     """
     client = get_google_sheet_client()
@@ -193,7 +193,7 @@ def retry_youtube_call(func_or_request, *args, **kwargs):
 
 def discover_shorts():
     """
-    Discover all Shorts (<= 180s) published “today in IST” across CHANNEL_IDS.
+    Discover all Shorts (<= 180s) published "today in IST" across CHANNEL_IDS.
     Returns:
       • video_to_channel: {video_id: channel_title}
       • video_to_published: {video_id: published_datetime_UTC}
@@ -296,7 +296,7 @@ def fetch_statistics(video_ids):
     return stats_dict
 
 
-# ----------------------- Core “Run Now” Function ----------------------------
+# ----------------------- Core "Run Now" Function ----------------------------
 
 def run_once_and_append():
     """
@@ -325,7 +325,7 @@ def run_once_and_append():
     header = all_data[0] if all_data else []
     rows = all_data[1:] if len(all_data) > 1 else []
 
-    # If the sheet is empty OR header doesn’t exactly match EXPECTED_HEADER, re-initialize:
+    # If the sheet is empty OR header doesn't exactly match EXPECTED_HEADER, re-initialize:
     if header != EXPECTED_HEADER:
         try:
             ws.clear()
@@ -434,7 +434,7 @@ def run_once_and_append():
             st.warning(f"⚠️ Skipping {vid} (missing published_at info).")
             continue
 
-        # Convert stored UTC → IST for “Upload Date”
+        # Convert stored UTC → IST for "Upload Date"
         published_dt_utc = video_to_published_past[vid]
         published_dt_ist = published_dt_utc.astimezone(ist_tz)
         upload_str = published_dt_ist.strftime("%d/%m/%Y %H:%M:%S")
@@ -454,8 +454,8 @@ def run_once_and_append():
             new_rows.append([
                 vid,
                 channel_title,
-                upload_str,    # “dd/mm/yyyy hh:mm:ss” IST for Upload Date
-                cron_str,      # “dd/mm/yyyy hh:mm:ss” IST for Cronjob time
+                upload_str,    # "dd/mm/yyyy hh:mm:ss" IST for Upload Date
+                cron_str,      # "dd/mm/yyyy hh:mm:ss" IST for Cronjob time
                 str(viewCount),
                 str(likeCount),
                 str(commentCount),
@@ -491,14 +491,14 @@ st.title("📊 YouTube Shorts VPH & Engagement Tracker")
 st.write(
     """
     **How this works**:
-    1. A background scheduler runs **at the top of every hour** and calls our “Run Once” logic:
-       - It reads all tracked Shorts from the Google Sheet (column “Short ID”).
+    1. A background scheduler runs **at the top of every hour** and calls our "Run Once" logic:
+       - It reads all tracked Shorts from the Google Sheet (column "Short ID").
        - It discovers any *new* Shorts published *today in IST* and starts tracking them.
        - It fetches the latest stats for *all* tracked Shorts (old + new), computes VPH & engagement rate, 
          and appends a row per video with the new timestamp.
-       - **Both “Upload Date” and “Cronjob time” are in IST `dd/mm/yyyy HH:MM:SS` format.**
+       - **Both "Upload Date" and "Cronjob time" are in IST `dd/mm/yyyy HH:MM:SS` format.**
          Engagement rate is written as a decimal and as a percentage.
-    2. You can also click the button below to force a “Run Now” immediately.
+    2. You can also click the button below to force a "Run Now" immediately.
     3. The sheet accumulates one row per (Short ID, Cronjob time), letting you watch metrics evolve hour by hour.
     """
 )

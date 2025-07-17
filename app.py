@@ -3,8 +3,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 import pandas as pd
-from googleapiclient.discovery 
-import build
+from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from isodate import parse_duration
 import gspread
@@ -50,7 +49,8 @@ CHANNEL_IDS = [
 ]
 
 GOOGLE_SHEET_URL = (
-    "https://docs.google.com/spreadsheets/d/1nUfwXMJyEQsvDNMY_A1UAGlcMd5928HY2u_2vlnaTIA/edit?gid=0#gid=0"
+    "https://docs.google.com/spreadsheets/"
+    "d/1nUfwXMJyEQsvDNMY_A1UAGlcMd5928HY2u_2vlnaTIA/edit"
 )
 
 # This must exactly match the sheet's 10 columns

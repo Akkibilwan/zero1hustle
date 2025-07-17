@@ -1,6 +1,8 @@
 streamlit
-pandas
 google-api-python-client
-oauth2client
 isodate
+pandas
 gspread
+oauth2client
+google-auth-httplib2
+google-auth-oauthlib
